@@ -15,6 +15,14 @@ def mkdir_p(path):
         else:
             raise
 
+def rotate(ps,img_size):
+    deg = random.randint(0,360)
+    theta = np.radians(deg)
+    c, s = np.cos(theta), np.sin(theta)
+    R = np.array(((c,-s), (s, c)))
+    ps = ps[0] - img_size/2
+    return [(np.dot(ps,R.T)+img_size/2).astype(np.int)]
+
 def triangle(sz,x=0,y=0):
     vrx = np.array(([sz/2+x,0+y],[sz+x,sz+y],[0+x,sz+y]))
     vrx = vrx.reshape((-1,1,2))
@@ -35,20 +43,26 @@ if __name__=='__main__':
     args = vars(ap.parse_args())
 
     mkdir_p(args['output'])
-    if args['task']==1:
+    if args['task']==1 or args['task']==2:
         x=0
         while x<args['number']:
             #make a triangle
 	    img_t = np.zeros((args['size'],args['size'],1))
 	    x_offset = random.randint(0,args['size']-args['shape_size'])
 	    y_offset = random.randint(0,args['size']-args['shape_size'])
-	    img_t = cv2.fillPoly(img_t, triangle(args['shape_size'],x_offset,y_offset), (255,))
+            t_ps = triangle(args['shape_size'],x_offset,y_offset)
+            if args['task']==2:
+                t_ps=rotate(t_ps,args['size'])
+	    img_t = cv2.fillPoly(img_t, t_ps, (255,))
 
             #make a triangle
 	    img_r = np.zeros((args['size'],args['size'],1))
 	    x_offset = random.randint(0,args['size']-args['shape_size'])
 	    y_offset = random.randint(0,args['size']-args['shape_size'])
-	    img_r = cv2.fillPoly(img_r, rectangle(args['shape_size']/2,args['shape_size'],x_offset,y_offset), (255,))
+            r_ps = rectangle(args['shape_size']/2,args['shape_size'],x_offset,y_offset)
+            if args['task']==2:
+                r_ps=rotate(r_ps,args['size'])
+	    img_r = cv2.fillPoly(img_r, r_ps, (255,))
 
             img=np.maximum(img_r,img_t)
             if img.sum()<(img_t.sum()+img_r.sum()):
