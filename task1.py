@@ -28,20 +28,22 @@ def get_point():
         k=random.choice(data.keys())
         if 'input' not in data[k] or 'rectangle' not in data[k] or 'triangle' not in data[k]:
             continue
-        input = cv2.imread(data[k]['input'])[:,:,:1]
-        triangle = cv2.imread(data[k]['triangle'])[:,:,:1]
-        rectangle = cv2.imread(data[k]['rectangle'])[:,:,:1]
-        return input,np.concatenate((triangle,rectangle),axis=2)
+        input = cv2.imread(data[k]['input'])[None,:,:,:1]
+        triangle = cv2.imread(data[k]['triangle'])[None,:,:,:1]
+        rectangle = cv2.imread(data[k]['rectangle'])[None,:,:,:1]
+        return input,np.concatenate((triangle,rectangle),axis=3)
 
 def n2t(im):
-        return torch.from_numpy(np.transpose(im, (2, 0, 1)).astype(np.float)/255).float()
+        #return torch.from_numpy(np.transpose(im, (2, 0, 1)).astype(np.float)/255).float()
+        return torch.from_numpy(np.transpose(im, (0,3, 1, 2)).astype(np.float)/255).float()
 
 def t2n(im):
         n=im.cpu().data.numpy()
         n-=n.min()
         #n[n<0]=0
         div=255.0/max(1.0,n.max())
-        return (np.transpose(n,(1,2,0))*div).astype(np.uint8)
+        #return (np.transpose(n,(1,2,0))*div).astype(np.uint8)
+        return (np.transpose(n,(0,2,3,1))*div).astype(np.uint8)
 
 if __name__=='__main__':
     ap = argparse.ArgumentParser()
@@ -65,25 +67,33 @@ if __name__=='__main__':
                 pass
 
     model=MNET()
-    optimizer = optim.SGD(model.parameters(), lr=args['learning_rate'], momentum=0.9)
+    #optimizer = optim.SGD(model.parameters(), lr=args['learning_rate'], momentum=0.9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args['learning_rate'])
     criterion=nn.MSELoss()
+    #criterion=nn.BCEWithLogitsLoss()
     for x in xrange(100000):
         optimizer.zero_grad()
-        mini_loss=0
+        im_ins=[]
+        im_outs=[]
         for y in xrange(args['mini_batch']):
 	    im_in,im_out=get_point()
-	    im_in=Variable(n2t(im_in).unsqueeze(0))
-	    im_out=Variable(n2t(im_out).unsqueeze(0))
-	    output = model(im_in)
-	    loss = criterion(output, im_out)
-            mini_loss+=loss.data[0]/args['mini_batch']
-            loss.backward()
-        print mini_loss
+            im_ins.append(im_in)
+            im_outs.append(im_out)
+        im_in=Variable(n2t(np.concatenate(im_ins,axis=0)))
+        im_out=Variable(n2t(np.concatenate(im_outs,axis=0)))
+
+	output = model(im_in)
+	loss = criterion(output, im_out)
+        mini_loss = loss.data[0] #/args['mini_batch']
+        loss.backward()
         optimizer.step()
-        im_in_np=t2n(im_in[0])
-        im_out_np=t2n(im_out[0])
-        im_pred_np=t2n(output[0])
-        t=np.concatenate((im_in_np,im_out_np[:,:,:1],im_pred_np[:,:,:1]),axis=1)
-        r=np.concatenate((im_in_np,im_out_np[:,:,1:2],im_pred_np[:,:,1:2]),axis=1)
+
+        im_in_np=t2n(im_in)
+        im_out_np=t2n(im_out)
+        im_pred_np=t2n(output) #.astype(np.float32)
+        print mini_loss,im_pred_np.mean(),im_pred_np.max()
+        #im_pred_np=(((im_pred_np-im_pred_np.min())/im_pred_np.max())*255).astype(np.uint8)
+        t=np.concatenate((im_in_np[0],im_out_np[0,:,:,:1],im_pred_np[0,:,:,:1]),axis=1)
+        r=np.concatenate((im_in_np[0],im_out_np[0,:,:,1:2],im_pred_np[0,:,:,1:2]),axis=1)
         cv2.imshow('x',np.concatenate((t,r),axis=0))
         cv2.waitKey(10)
