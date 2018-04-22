@@ -32,10 +32,12 @@ def get_point():
         triangle = cv2.imread(data[k]['triangle'])[None,:,:,:1]
         rectangle = cv2.imread(data[k]['rectangle'])[None,:,:,:1]
         return input,np.concatenate((triangle,rectangle),axis=3)
+        #return input,np.concatenate((triangle,triangle),axis=3)
 
 def n2t(im):
         #return torch.from_numpy(np.transpose(im, (2, 0, 1)).astype(np.float)/255).float()
         return torch.from_numpy(np.transpose(im, (0,3, 1, 2)).astype(np.float)/255).float()
+        #return torch.from_numpy(np.transpose(im, (0,3, 1, 2)).astype(np.float)).float()
 
 def t2n(im):
         n=im.cpu().data.numpy()
@@ -67,12 +69,12 @@ if __name__=='__main__':
                 pass
 
     model=MNET()
-    #optimizer = optim.SGD(model.parameters(), lr=args['learning_rate'], momentum=0.9)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args['learning_rate'])
+    optimizer = optim.SGD(model.parameters(), lr=args['learning_rate'], momentum=0.9)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=args['learning_rate'])
     criterion=nn.MSELoss()
+    #criterion=nn.BCELoss()
     #criterion=nn.BCEWithLogitsLoss()
     for x in xrange(100000):
-        optimizer.zero_grad()
         im_ins=[]
         im_outs=[]
         for y in xrange(args['mini_batch']):
@@ -81,10 +83,14 @@ if __name__=='__main__':
             im_outs.append(im_out)
         im_in=Variable(n2t(np.concatenate(im_ins,axis=0)))
         im_out=Variable(n2t(np.concatenate(im_outs,axis=0)))
+        print im_in.size(),im_out.size()
 
 	output = model(im_in)
 	loss = criterion(output, im_out)
+        #loss = F.cross_entropy(output, im_out) #, weight=weight, size_average=self.size_average)
+        #loss = F.nll_loss(output, im_out) #, weight=weight, size_average=self.size_average)
         mini_loss = loss.data[0] #/args['mini_batch']
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
