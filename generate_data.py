@@ -43,24 +43,30 @@ if __name__=='__main__':
     args = vars(ap.parse_args())
 
     mkdir_p(args['output'])
-    if args['task']==1 or args['task']==2:
+    if args['task'] in [1,2,3]:
         x=0
         while x<args['number']:
             #make a triangle
 	    img_t = np.zeros((args['size'],args['size'],1))
-	    x_offset = random.randint(0,args['size']-args['shape_size'])
-	    y_offset = random.randint(0,args['size']-args['shape_size'])
-            t_ps = triangle(args['shape_size'],x_offset,y_offset)
-            if args['task']==2:
+            t_sz = args['shape_size']
+            if args['task']==3:
+                t_sz = random.randint(10,args['shape_size']*4)
+	    x_offset = random.randint(0,args['size']-t_sz)
+	    y_offset = random.randint(0,args['size']-t_sz)
+            t_ps = triangle(t_sz,x_offset,y_offset)
+            if args['task']>1:
                 t_ps=rotate(t_ps,args['size'])
 	    img_t = cv2.fillPoly(img_t, t_ps, (255,))
 
             #make a triangle
 	    img_r = np.zeros((args['size'],args['size'],1))
-	    x_offset = random.randint(0,args['size']-args['shape_size'])
-	    y_offset = random.randint(0,args['size']-args['shape_size'])
-            r_ps = rectangle(args['shape_size']/2,args['shape_size'],x_offset,y_offset)
-            if args['task']==2:
+            r_sz=args['shape_size']
+            if args['task']==3:
+                r_sz = random.randint(10,args['shape_size']*4)
+	    x_offset = random.randint(0,args['size']-r_sz)
+	    y_offset = random.randint(0,args['size']-r_sz)
+            r_ps = rectangle(r_sz/2,r_sz,x_offset,y_offset)
+            if args['task']>1:
                 r_ps=rotate(r_ps,args['size'])
 	    img_r = cv2.fillPoly(img_r, r_ps, (255,))
 
