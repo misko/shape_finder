@@ -4,6 +4,7 @@ import argparse
 import cv2
 import os
 import errno
+import shutil
 import random 
 import torch
 from torch.autograd import Variable
@@ -36,7 +37,10 @@ def get_point():
 
 def n2t(im):
         #return torch.from_numpy(np.transpose(im, (2, 0, 1)).astype(np.float)/255).float()
-        return torch.from_numpy(np.transpose(im, (0,3, 1, 2)).astype(np.float)/255).float()
+	if args['cuda']==1:
+        	return torch.from_numpy(np.transpose(im, (0,3, 1, 2)).astype(np.float)/255).float().cuda()
+	else:
+        	return torch.from_numpy(np.transpose(im, (0,3, 1, 2)).astype(np.float)/255).float()
         #return torch.from_numpy(np.transpose(im, (0,3, 1, 2)).astype(np.float)).float()
 
 def t2n(im):
@@ -47,11 +51,23 @@ def t2n(im):
         #return (np.transpose(n,(1,2,0))*div).astype(np.uint8)
         return (np.transpose(n,(0,2,3,1))*div).astype(np.uint8)
 
+#https://discuss.pytorch.org/t/saving-and-loading-a-model-in-pytorch/2610/3
+# <3 mratsimMamy Ratsimbazafy
+def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, 'model_best.pth.tar')
+
+
+
 if __name__=='__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument("-i", "--input-folder", help="input folder",type=str, default="./out")
     ap.add_argument("-mb", "--mini-batch", help="mb size",type=int, default=8)
     ap.add_argument("-s", "--save-dir", help="save dir",type=str,default="./out")
+    ap.add_argument("-c", "--cuda", help="cuda?",type=int,default=0)
+    ap.add_argument("-x", "--show", help="show?",type=int,default=0)
+    ap.add_argument("-r", "--resume", help="resume",type=str,default="")
     ap.add_argument("-lr", "--learning-rate", help="save dir",type=float,default=0.001)
     args = vars(ap.parse_args())
 
@@ -69,7 +85,19 @@ if __name__=='__main__':
                 pass
 
     model=MNET()
+    if args['cuda']==1:
+       model= model.cuda()
     optimizer = optim.SGD(model.parameters(), lr=args['learning_rate'], momentum=0.9)
+    if args['resume']!='':
+        if os.path.isfile(args['resume']):
+            print("=> loading checkpoint '{}'".format(args['resume']))
+            checkpoint = torch.load(args['resume'])
+            model.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            print("=> loaded checkpoint '{}' (epoch {})"
+                  .format(args['resume'], checkpoint['epoch']))
+        else:
+            print("=> no checkpoint found at '{}'".format(args['resume']))
     #optimizer = torch.optim.Adam(model.parameters(), lr=args['learning_rate'])
     criterion=nn.MSELoss()
     #criterion=nn.BCELoss()
@@ -101,5 +129,12 @@ if __name__=='__main__':
         #im_pred_np=(((im_pred_np-im_pred_np.min())/im_pred_np.max())*255).astype(np.uint8)
         t=np.concatenate((im_in_np[0],im_out_np[0,:,:,:1],im_pred_np[0,:,:,:1]),axis=1)
         r=np.concatenate((im_in_np[0],im_out_np[0,:,:,1:2],im_pred_np[0,:,:,1:2]),axis=1)
-        cv2.imshow('x',np.concatenate((t,r),axis=0))
-        cv2.waitKey(10)
+        if args['show']==1:
+            cv2.imshow('x',np.concatenate((t,r),axis=0))
+            cv2.waitKey(10)
+	if x%100:
+	    save_checkpoint({
+            'epoch': x + 1,
+            'state_dict': model.state_dict(),
+            'optimizer' : optimizer.state_dict(),
+            }, True)
